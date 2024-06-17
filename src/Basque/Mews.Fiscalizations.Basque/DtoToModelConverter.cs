@@ -28,6 +28,28 @@ public static class DtoToModelConverter
         );
     }
 
+    internal static CancelInvoiceResponse Convert0(
+    Dto.TicketBaiResponse response,
+   // string qrCodeUri,
+    string xmlRequestContent,
+    string xmlResponseContent,
+    //string tbaiIdentifier,
+    string signatureValue)
+    {
+        var result = response.Salida;
+        return new CancelInvoiceResponse(
+            xmlRequestContent: xmlRequestContent,
+            xmlResponseContent: xmlResponseContent,
+            //qrCodeUri: qrCodeUri,
+            //tbaiIdentifier: tbaiIdentifier,
+            received: DateTime.ParseExact(result.FechaRecepcion, "dd-MM-yyyy H:mm:ss", CultureInfo.InvariantCulture),
+            state: ParseEnum<InvoiceState>(result.Estado),
+            description: result.Descripcion,
+            signatureValue: signatureValue,
+            validationResults: result.ResultadosValidacion?.Select(v => Convert(v))
+        );
+    }
+
     internal static SendInvoiceResponse Convert(
         LROEPJ240FacturasEmitidasConSGAltaRespuesta response,
         string qrCodeUri,

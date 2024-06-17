@@ -16,13 +16,13 @@ namespace Mews.Fiscalizations.Basque;
 
 public sealed class TicketBaiClient
 {
-    public TicketBaiClient(X509Certificate2 certificate, Region region, Environment environment)
+    public TicketBaiClient(X509Certificate2 certificate, Region region, Environment environment, ClaimedRoleType claimedRoleType)
     {
         Certificate = certificate;
         Environment = environment;
         Region = region;
         ServiceInfo = new ServiceInfo(region);
-        
+        ClaimedRoleType = claimedRoleType;
         var requestHandler = new HttpClientHandler();
         requestHandler.ClientCertificates.Add(certificate);
         if (region == Region.Bizkaia)
@@ -33,6 +33,8 @@ public sealed class TicketBaiClient
 
     }
 
+
+
     private HttpClient HttpClient { get; }
 
     private X509Certificate2 Certificate { get; }
@@ -41,8 +43,36 @@ public sealed class TicketBaiClient
 
     private Region Region { get; }
 
+    private ClaimedRoleType ClaimedRoleType { get; }
+
     private ServiceInfo ServiceInfo { get; }
 
+    public async Task<CancelInvoiceResponse> CancelInvoiceAsync(TicketBaiCancelInvoiceData invoiceData, CancellationToken cancellationToken = default)
+    {
+        //if (Region == Region.Bizkaia)
+        //{
+        //    return await SendBizkaiaInvoiceAsync(invoiceData, cancellationToken);
+        //}
+
+        return await CancelTicketBaiInvoiceAsync(invoiceData);
+    }
+    private async Task<CancelInvoiceResponse> CancelTicketBaiInvoiceAsync(TicketBaiCancelInvoiceData invoiceData)
+    {
+        var signedRequest = invoiceData.SignedRequest;
+        var requestContent = new StringContent(signedRequest.OuterXml, ServiceInfo.Encoding, MediaTypeNames.Application.Xml);
+        var response = await HttpClient.PostAsync(ServiceInfo.CancelInvoiceUri(Environment), requestContent);
+
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var ticketBaiResponse = XmlSerializer.Deserialize<Dto.TicketBaiResponse>(responseContent);
+        return DtoToModelConverter.Convert0(
+            response: ticketBaiResponse,
+           // qrCodeUri: invoiceData.QrCodeUri,
+            xmlRequestContent: signedRequest.OuterXml,
+            xmlResponseContent: responseContent,
+           // tbaiIdentifier: invoiceData.TbaiIdentifier,
+            signatureValue: invoiceData.TrimmedSignature
+        );
+    }
     /// <summary>
     /// Sends the invoice to the gov API using the provided invoiceData.
     /// </summary>
@@ -116,6 +146,8 @@ public sealed class TicketBaiClient
         );
     }
 
+  
+
     private async Task<SendInvoiceResponse> SendTicketBaiInvoiceAsync(TicketBaiInvoiceData invoiceData)
     {
         var signedRequest = invoiceData.SignedRequest;
@@ -162,6 +194,22 @@ public sealed class TicketBaiClient
         );
     }
 
+    /// <summary>
+    /// Generates the QR code URI, TBAI Identifier and the signed request document without actually calling the API.
+    /// This allows displaying the required invoice data on your generated invoices without waiting for the API response.
+    /// To report the invoice to the gov authorities, 'SendInvoiceAsync' must be used.
+    /// </summary>
+    /// <param name="request">Invoice request which will be mapped to Dto.TicketBai.</param>
+    public TicketBaiCancelInvoiceData GetTicketBaiCancelInvoiceData(CancelInvoiceRequest request, string id)
+    {
+        var signedRequest = GetSignedInvoiceDocument(request, id);
+        var signatureValue = signedRequest.GetElementsByTagName("ds:SignatureValue")[0].InnerText;
+        return new TicketBaiCancelInvoiceData(
+            signedRequest: signedRequest,
+            trimmedSignature: signatureValue.Substring(0, Math.Min(signatureValue.Length, 100))
+        );
+    }
+
     private string GenerateTbaiIdentifier(string signature, string issuerTaxId, DateTime issued)
     {
         var trimmedSignature = signature.Substring(0, Math.Min(signature.Length, 13));
@@ -173,12 +221,25 @@ public sealed class TicketBaiClient
     private XmlDocument GetSignedInvoiceDocument(SendInvoiceRequest request,string id)
     {
         var ticketBaiRequest = ModelToDtoConverter.Convert(request, ServiceInfo);
+      
         var xmlDoc = XmlSerializer.Serialize(ticketBaiRequest, new XmlSerializationParameters(
             encoding: ServiceInfo.Encoding,
             namespaces: NonEmptyEnumerable.Create(new XmlNamespace("http://www.w3.org/2000/09/xmldsig#"))
         ));
         xmlDoc.OwnerDocument.PreserveWhitespace = true;
         return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, request.Invoice.InvoiceData.TransactionDate.Get(), id).Document;
+    }
+
+    private XmlDocument GetSignedInvoiceDocument(CancelInvoiceRequest request, string id)
+    {
+        var ticketBaiRequest = ModelToDtoConverter.Convert(request, ServiceInfo);
+
+        var xmlDoc = XmlSerializer.Serialize(ticketBaiRequest, new XmlSerializationParameters(
+            encoding: ServiceInfo.Encoding,
+            namespaces: NonEmptyEnumerable.Create(new XmlNamespace("http://www.w3.org/2000/09/xmldsig#"))
+        ));
+        xmlDoc.OwnerDocument.PreserveWhitespace = true;
+        return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, request.InvoiceID.Header.Issued, id).Document;
     }
 
     private SignatureDocument GetSignedInvoiceDocument(XmlDocument doc, DateTime dateTime, string elementIdToSign)
@@ -194,13 +255,18 @@ public sealed class TicketBaiClient
             Region.Gipuzkoa, _ => "vSe1CH7eAFVkGN0X2Y7Nl9XGUoBnziDA5BGUSsyt8mg="
         );
 
+        var claimedRole = ClaimedRoleType.Match(
+            ClaimedRoleType.Supplier, _ => "Supplier",
+             ClaimedRoleType.Customer, _ => "Customer",
+            ClaimedRoleType.Thirdparty, _ => "Thirdparty"); 
+
         var signatureParameters = new SignatureParameters(
             xmlDocumentToSign: doc,
             signer: new Signer(Certificate),
             digestMethod: DigestMethod.SHA256,
             signatureMethod: SignatureMethod.RSAwithSHA256,
             dataFormat: new DataFormat(MimeType: "text/xml"),
-            signerRole: new SignerRole(Certificate.ToEnumerable()),
+            signerRole: new SignerRole(Certificate.ToEnumerable(), claimedRole.ToEnumerable()),
            // signingDate: DateTime.Now,
               signingDate: dateTime,
             signaturePolicyInfo: new SignaturePolicyInfo(policyUri, policyHash, DigestMethod.SHA256, policyUri),

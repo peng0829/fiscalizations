@@ -18,7 +18,7 @@ internal sealed class ServiceInfo
             {
                 [Environment.Test] = new Uri("https://pruebas-ticketbai.araba.eus"),
                 [Environment.Production] = new Uri("https://ticketbai.araba.eus")
-            },
+            },//https://pruebas-ticketbai.araba.eus/TicketBAI/v1/anulaciones/baja
             Region.Bizkaia, _ => new Dictionary<Environment, Uri>
             {
                 [Environment.Test] = new Uri("https://pruesarrerak.bizkaia.eus/N3B4000M/aurkezpena"),
@@ -47,12 +47,20 @@ internal sealed class ServiceInfo
             Region.Araba, _ => new Uri("TicketBAI/v1/facturas/", UriKind.Relative),
             Region.Bizkaia, _ => new Uri("", UriKind.Relative)
         );
+
+        RelativeCancelInvoiceUri = region.Match(
+            Region.Gipuzkoa, _ => new Uri("sarrerak/baja/", UriKind.Relative),
+            Region.Araba, _ => new Uri("TicketBAI/v1/anulaciones/", UriKind.Relative),
+            Region.Bizkaia, _ => new Uri("", UriKind.Relative)
+        );
         RelativeQrCodeUri = region.Match(
             Region.Gipuzkoa, _ => new Uri("qr/", UriKind.Relative),
             Region.Araba, _ => new Uri("tbai/qrtbai/", UriKind.Relative),
             Region.Bizkaia, _ => new Uri("QRTBAI/", UriKind.Relative)
         );
         Encoding = Encoding.UTF8;
+
+
     }
 
     internal IDVersionTicketBaiType1 Version { get; }
@@ -60,6 +68,8 @@ internal sealed class ServiceInfo
     internal Dictionary<Environment, Uri> InvoiceBaseUrls { get; }
 
     internal Dictionary<Environment, Uri> QrBaseUrls { get; }
+
+    internal Uri RelativeCancelInvoiceUri { get; }
 
     internal Uri RelativeSendInvoiceUri { get; }
 
@@ -70,5 +80,10 @@ internal sealed class ServiceInfo
     internal Uri SendInvoiceUri(Environment environment)
     {
         return new Uri(InvoiceBaseUrls[environment], RelativeSendInvoiceUri);
+    }
+
+    internal Uri CancelInvoiceUri(Environment environment)
+    {
+        return new Uri(InvoiceBaseUrls[environment], RelativeCancelInvoiceUri);
     }
 }

@@ -1,4 +1,6 @@
-﻿using Mews.Fiscalizations.Basque.Model;
+﻿using Mews.Fiscalizations.Basque.Dto;
+using Mews.Fiscalizations.Basque.Model;
+
 using System.Globalization;
 
 namespace Mews.Fiscalizations.Basque;
@@ -6,6 +8,90 @@ namespace Mews.Fiscalizations.Basque;
 internal static class ModelToDtoConverter
 {
     private static readonly CultureInfo CultureInfo = CultureInfo.InvariantCulture;
+
+    #region AnulaTicketBai
+    public static Dto.AnulaTicketBai Convert(CancelInvoiceRequest cancelInvoiceRequest, ServiceInfo serviceInfo)
+    {
+        return new Dto.AnulaTicketBai
+        {
+            Cabecera = new Dto.Cabecera
+            {
+                IDVersionTBAI = (Dto.IDVersionTicketBaiType)serviceInfo.Version
+            },
+            IDFactura = Convert(cancelInvoiceRequest.InvoiceID),
+
+            HuellaTBAI = Convert(cancelInvoiceRequest.InvoiceFooter),
+            Signature = null // TODO: Convert(sendInvoiceRequest.Signature)
+        };
+    }
+
+    private static Dto.IDFactura Convert(CancelInvoiceID id)
+    {
+        return new Dto.IDFactura
+        {
+            Emisor = Convert0(id.Issuer),
+            CabeceraFactura = Convert(id.Header)
+        };
+    }
+    private static Dto.CabeceraFacturaType Convert(CancelInvoiceHeader header)
+    {
+        return new Dto.CabeceraFacturaType
+        {
+            SerieFactura = header.Series,
+            NumFactura = header.Number,
+            FechaExpedicionFactura = Convert(header.Issued.Date),
+        };
+    }
+    private static Dto.Emisor Convert0(Issuer issuer)
+    {
+        return new Dto.Emisor
+        {
+            NIF = issuer.Nif.TaxpayerNumber,
+            ApellidosNombreRazonSocial = issuer.Name.Value
+        };
+    }
+
+    private static Dto.HuellaTBAI Convert(CancelInvoiceFooter footer)
+    {
+        return new Dto.HuellaTBAI
+        {
+
+            Software = Convert0(footer.Software),
+            NumSerieDispositivo = footer.DeviceSerialNumber
+        };
+    }
+
+    private static Dto.SoftwareFacturacionType Convert0(Software software)
+    {
+        return new Dto.SoftwareFacturacionType
+        {
+            LicenciaTBAI = software.License.Value,
+            Version = software.Version.Value,
+            Nombre = software.Name.Value,
+            EntidadDesarrolladora = Convert0(software.Developer)
+        };
+    }
+    private static Dto.EntidadDesarrolladoraType Convert0(SoftwareDeveloper developer)
+    {
+        return developer.Match(
+            local => new Dto.EntidadDesarrolladoraType
+            {
+                Item = local.Nif.TaxpayerNumber
+            },
+            foreign => new Dto.EntidadDesarrolladoraType
+            {
+                Item = new Dto.IDOtro
+                {
+                    CodigoPaisSpecified = foreign.Country.NonEmpty,
+                    CodigoPais = foreign.Country.Map(c => ConvertCountryType2(c)).ToNullable(),
+                    ID = foreign.Id.Value,
+                    IDType = Convert(foreign.IdType)
+                }
+            }
+        );
+    }
+
+    #endregion
 
     public static Dto.TicketBai Convert(SendInvoiceRequest sendInvoiceRequest, ServiceInfo serviceInfo)
     {
@@ -21,6 +107,7 @@ internal static class ModelToDtoConverter
             Signature = null // TODO: Convert(sendInvoiceRequest.Signature)
         };
     }
+
 
     private static Dto.Sujetos Convert(Subject subject)
     {

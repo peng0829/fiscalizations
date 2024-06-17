@@ -24,3 +24,22 @@ public sealed class TicketBaiInvoiceData
 
     public String1To100 TrimmedSignature { get; }
 }
+
+public sealed class TicketBaiCancelInvoiceData
+{
+    public TicketBaiCancelInvoiceData(
+        XmlDocument signedRequest,
+        string trimmedSignature)
+    {
+        SignedRequest = signedRequest;
+        TrimmedSignature = trimmedSignature;
+    }
+
+    public XmlDocument SignedRequest { get; }
+
+    //public string TbaiIdentifier { get; }
+
+    //public string QrCodeUri { get; }
+
+    public string TrimmedSignature { get; }
+}
