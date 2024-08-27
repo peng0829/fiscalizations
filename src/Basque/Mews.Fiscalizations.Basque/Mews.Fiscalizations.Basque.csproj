@@ -13,6 +13,7 @@
     <PackageVersion>8.0.0</PackageVersion>
     <LangVersion>12</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Platforms>AnyCPU;x64;x86</Platforms>
   </PropertyGroup>
 
   <ItemGroup>

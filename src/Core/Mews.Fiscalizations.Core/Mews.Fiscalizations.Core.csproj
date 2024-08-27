@@ -13,6 +13,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageVersion>7.0.0</PackageVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Platforms>AnyCPU;x64;x86</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
