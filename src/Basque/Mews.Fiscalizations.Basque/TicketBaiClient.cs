@@ -11,6 +11,7 @@ using Mews.Fiscalizations.Basque.Dto.Bizkaia;
 using Mews.Fiscalizations.Basque.Model;
 using Mews.Fiscalizations.Core.Xml;
 using Mews.Fiscalizations.Core.Xml.Signing.Microsoft.Xades;
+using System.Diagnostics;
 
 namespace Mews.Fiscalizations.Basque;
 
@@ -151,6 +152,7 @@ public sealed class TicketBaiClient
     private async Task<SendInvoiceResponse> SendTicketBaiInvoiceAsync(TicketBaiInvoiceData invoiceData)
     {
         var signedRequest = invoiceData.SignedRequest;
+        Debug.WriteLine("signedRequest.OuterXml:" + signedRequest.OuterXml);
         var requestContent = new StringContent(signedRequest.OuterXml, ServiceInfo.Encoding, MediaTypeNames.Application.Xml);
         var response = await HttpClient.PostAsync(ServiceInfo.SendInvoiceUri(Environment), requestContent);
 
