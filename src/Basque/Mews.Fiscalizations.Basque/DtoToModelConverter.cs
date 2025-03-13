@@ -1,5 +1,6 @@
 ﻿using Mews.Fiscalizations.Basque.Dto.Bizkaia;
 using Mews.Fiscalizations.Basque.Model;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace Mews.Fiscalizations.Basque;
@@ -15,17 +16,30 @@ public static class DtoToModelConverter
         String1To100 signatureValue)
     {
         var result = response.Salida;
-        return new SendInvoiceResponse(
-            xmlRequestContent: xmlRequestContent,
-            xmlResponseContent: xmlResponseContent,
-            qrCodeUri: qrCodeUri,
-            tbaiIdentifier: tbaiIdentifier,
-            received: DateTime.ParseExact(result.FechaRecepcion, "dd-MM-yyyy H:mm:ss", CultureInfo.InvariantCulture),
-            state: ParseEnum<InvoiceState>(result.Estado),
-            description: result.Descripcion,
-            signatureValue: signatureValue,
-            validationResults: result.ResultadosValidacion?.Select(v => Convert(v))
-        );
+
+        Debug.WriteLine("DtoToModelConverter");
+
+        foreach (var item in result.ResultadosValidacion)
+        {
+            Debug.WriteLine(item.Codigo + "-" + item.Descripcion);
+        }
+        var sendSesponse = new SendInvoiceResponse(
+           xmlRequestContent: xmlRequestContent,
+           xmlResponseContent: xmlResponseContent,
+           qrCodeUri: qrCodeUri,
+           tbaiIdentifier: tbaiIdentifier,
+           received: DateTime.ParseExact(result.FechaRecepcion, "dd-MM-yyyy H:mm:ss", CultureInfo.InvariantCulture),
+           state: ParseEnum<InvoiceState>(result.Estado),
+           description: result.Descripcion,
+           signatureValue: signatureValue,
+           validationResults: result.ResultadosValidacion?.Select(v => Convert(v)));
+        foreach (var item in sendSesponse.ValidationResults.Get())
+        {
+            Debug.WriteLine("ValidationResults");
+            Debug.WriteLine(item.ErrorCode + "-" + item.Description);
+        }
+        return sendSesponse; 
+        
     }
 
     internal static CancelInvoiceResponse Convert0(
@@ -95,6 +109,7 @@ public static class DtoToModelConverter
             "B4_2000061" => ErrorCode.InvalidOrMissingInvoiceChain,
             "B4_2000038" => ErrorCode.BreakdownMustHaveProvisionOrDeliveryOrBoth,
             "B4_2000030" => ErrorCode.InvoiceMustContainAtLeastOneExemptOrNonExemptParty,
+            "B4_2000031" => ErrorCode.InvoiceMustContainAtLeastOneExemptOrNonExemptParty,
             _ => throw new NotImplementedException($"We currently have no support for this {bizkaiaErrorCode} error code.")
         };
     }
