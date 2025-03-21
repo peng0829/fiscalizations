@@ -17,12 +17,13 @@ public static class DtoToModelConverter
     {
         var result = response.Salida;
 
-        Debug.WriteLine("DtoToModelConverter");
+       // Debug.WriteLine("DtoToModelConverter");
 
-        foreach (var item in result.ResultadosValidacion)
-        {
-            Debug.WriteLine(item.Codigo + "-" + item.Descripcion);
-        }
+        //foreach (var item in result.ResultadosValidacion)
+        //{
+        //    Debug.WriteLine(item.Codigo + "-" + item.Descripcion);
+        //}
+
         var sendSesponse = new SendInvoiceResponse(
            xmlRequestContent: xmlRequestContent,
            xmlResponseContent: xmlResponseContent,
@@ -33,11 +34,11 @@ public static class DtoToModelConverter
            description: result.Descripcion,
            signatureValue: signatureValue,
            validationResults: result.ResultadosValidacion?.Select(v => Convert(v)));
-        foreach (var item in sendSesponse.ValidationResults.Get())
-        {
-            Debug.WriteLine("ValidationResults");
-            Debug.WriteLine(item.ErrorCode + "-" + item.Description);
-        }
+        //foreach (var item in sendSesponse.ValidationResults.Get())
+        //{
+        //    Debug.WriteLine("ValidationResults");
+        //    Debug.WriteLine(item.ErrorCode + "-" + item.Description);
+        //}
         return sendSesponse; 
         
     }

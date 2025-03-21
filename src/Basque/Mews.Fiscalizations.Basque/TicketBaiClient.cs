@@ -152,7 +152,7 @@ public sealed class TicketBaiClient
     private async Task<SendInvoiceResponse> SendTicketBaiInvoiceAsync(TicketBaiInvoiceData invoiceData)
     {
         var signedRequest = invoiceData.SignedRequest;
-        Debug.WriteLine("signedRequest.OuterXml:" + signedRequest.OuterXml);
+        //Debug.WriteLine("signedRequest.OuterXml:" + signedRequest.OuterXml);
         var requestContent = new StringContent(signedRequest.OuterXml, ServiceInfo.Encoding, MediaTypeNames.Application.Xml);
         var response = await HttpClient.PostAsync(ServiceInfo.SendInvoiceUri(Environment), requestContent);
 
