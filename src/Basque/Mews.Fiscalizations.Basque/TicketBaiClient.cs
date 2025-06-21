@@ -152,20 +152,49 @@ public sealed class TicketBaiClient
     private async Task<SendInvoiceResponse> SendTicketBaiInvoiceAsync(TicketBaiInvoiceData invoiceData)
     {
         var signedRequest = invoiceData.SignedRequest;
-        //Debug.WriteLine("signedRequest.OuterXml:" + signedRequest.OuterXml);
+        Debug.WriteLine("signedRequest.OuterXml:" + signedRequest.OuterXml);
         var requestContent = new StringContent(signedRequest.OuterXml, ServiceInfo.Encoding, MediaTypeNames.Application.Xml);
+        
         var response = await HttpClient.PostAsync(ServiceInfo.SendInvoiceUri(Environment), requestContent);
 
         var responseContent = await response.Content.ReadAsStringAsync();
-        var ticketBaiResponse = XmlSerializer.Deserialize<Dto.TicketBaiResponse>(responseContent);
-        return DtoToModelConverter.Convert(
-            response: ticketBaiResponse,
-            qrCodeUri: invoiceData.QrCodeUri,
-            xmlRequestContent: signedRequest.OuterXml,
-            xmlResponseContent: responseContent,
-            tbaiIdentifier: invoiceData.TbaiIdentifier,
-            signatureValue: invoiceData.TrimmedSignature
-        );
+        //var ticketBaiResponse = XmlSerializer.Deserialize<Dto.TicketBaiResponse>(responseContent);
+        //return DtoToModelConverter.Convert(
+        //    response: ticketBaiResponse,
+        //    qrCodeUri: invoiceData.QrCodeUri,
+        //    xmlRequestContent: signedRequest.OuterXml,
+        //    xmlResponseContent: responseContent,
+        //    tbaiIdentifier: invoiceData.TbaiIdentifier,
+        //    signatureValue: invoiceData.TrimmedSignature
+        //);
+        try
+        {
+            var ticketBaiResponse = XmlSerializer.Deserialize<TicketBaiResponse>(responseContent);
+            return DtoToModelConverter.Convert(
+                response: ticketBaiResponse,
+                qrCodeUri: invoiceData.QrCodeUri,
+                xmlRequestContent: signedRequest.OuterXml,
+                xmlResponseContent: responseContent,
+                tbaiIdentifier: invoiceData.TbaiIdentifier,
+                signatureValue: invoiceData.TrimmedSignature
+            );
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new SendInvoiceResponse(
+                xmlRequestContent: signedRequest.OuterXml,
+                xmlResponseContent: "",
+                qrCodeUri: invoiceData.QrCodeUri,
+                tbaiIdentifier: invoiceData.TbaiIdentifier,
+                received: DateTime.UtcNow,
+                state: InvoiceState.Refused,
+                description: "Server error. Please try again.",
+                signatureValue: invoiceData.TrimmedSignature,
+                validationResults: [
+                    new SendInvoiceValidationResult(ErrorCode.ServerErrorTryAgain, $"Unhandled server error: {ex.Message}")
+                ]
+            );
+        }
     }
 
     /// <summary>
@@ -174,9 +203,9 @@ public sealed class TicketBaiClient
     /// To report the invoice to the gov authorities, 'SendInvoiceAsync' must be used.
     /// </summary>
     /// <param name="request">Invoice request which will be mapped to Dto.TicketBai.</param>
-    public TicketBaiInvoiceData GetTicketBaiInvoiceData(SendInvoiceRequest request,string id)
+    public TicketBaiInvoiceData GetTicketBaiInvoiceData(SendInvoiceRequest request, DateTimeOffset signedDateTimeOffset,string id)
     {
-        var signedRequest = GetSignedInvoiceDocument(request, id);
+        var signedRequest = GetSignedInvoiceDocument(request, signedDateTimeOffset, id);
         var signatureValue = signedRequest.GetElementsByTagName("ds:SignatureValue")[0].InnerText;
         var header = request.Invoice.Header;
         var tbaiIdentifier = GenerateTbaiIdentifier(signatureValue, request.Subject.Issuer.Nif.TaxpayerNumber, header.Issued);
@@ -202,9 +231,9 @@ public sealed class TicketBaiClient
     /// To report the invoice to the gov authorities, 'SendInvoiceAsync' must be used.
     /// </summary>
     /// <param name="request">Invoice request which will be mapped to Dto.TicketBai.</param>
-    public TicketBaiCancelInvoiceData GetTicketBaiCancelInvoiceData(CancelInvoiceRequest request, string id)
+    public TicketBaiCancelInvoiceData GetTicketBaiCancelInvoiceData(CancelInvoiceRequest request, DateTimeOffset signedDateTimeOffset, string id)
     {
-        var signedRequest = GetSignedInvoiceDocument(request, id);
+        var signedRequest = GetSignedInvoiceDocument(request, signedDateTimeOffset, id);
         var signatureValue = signedRequest.GetElementsByTagName("ds:SignatureValue")[0].InnerText;
         return new TicketBaiCancelInvoiceData(
             signedRequest: signedRequest,
@@ -220,7 +249,7 @@ public sealed class TicketBaiClient
         return $"{identifier}{crc}";
     }
 
-    private XmlDocument GetSignedInvoiceDocument(SendInvoiceRequest request,string id)
+    private XmlDocument GetSignedInvoiceDocument(SendInvoiceRequest request, DateTimeOffset signedDateTimeOffset, string id)
     {
         var ticketBaiRequest = ModelToDtoConverter.Convert(request, ServiceInfo);
       
@@ -229,10 +258,10 @@ public sealed class TicketBaiClient
             namespaces: NonEmptyEnumerable.Create(new XmlNamespace("http://www.w3.org/2000/09/xmldsig#"))
         ));
         xmlDoc.OwnerDocument.PreserveWhitespace = true;
-        return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, request.Invoice.InvoiceData.TransactionDate.Get(), id).Document;
+        return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, signedDateTimeOffset, id).Document;
     }
 
-    private XmlDocument GetSignedInvoiceDocument(CancelInvoiceRequest request, string id)
+    private XmlDocument GetSignedInvoiceDocument(CancelInvoiceRequest request, DateTimeOffset signedDateTimeOffset, string id)
     {
         var ticketBaiRequest = ModelToDtoConverter.Convert(request, ServiceInfo);
 
@@ -241,10 +270,10 @@ public sealed class TicketBaiClient
             namespaces: NonEmptyEnumerable.Create(new XmlNamespace("http://www.w3.org/2000/09/xmldsig#"))
         ));
         xmlDoc.OwnerDocument.PreserveWhitespace = true;
-        return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, request.InvoiceID.Header.Issued, id).Document;
+        return GetSignedInvoiceDocument(xmlDoc.OwnerDocument, signedDateTimeOffset, id).Document;
     }
 
-    private SignatureDocument GetSignedInvoiceDocument(XmlDocument doc, DateTime dateTime, string elementIdToSign)
+    private SignatureDocument GetSignedInvoiceDocument(XmlDocument doc, DateTimeOffset signedDateTimeOffset, string elementIdToSign)
     {
         var policyUri = Region.Match(
             Region.Bizkaia, _ => "https://www.batuz.eus/fitxategiak/batuz/ticketbai/sinadura_elektronikoaren_zehaztapenak_especificaciones_de_la_firma_electronica_v1_1.pdf",
@@ -270,7 +299,7 @@ public sealed class TicketBaiClient
             dataFormat: new DataFormat(MimeType: "text/xml"),
             signerRole: new SignerRole(Certificate.ToEnumerable(), claimedRole.ToEnumerable()),
            // signingDate: DateTime.Now,
-              signingDate: dateTime,
+              signingDate: signedDateTimeOffset,
             signaturePolicyInfo: new SignaturePolicyInfo(policyUri, policyHash, DigestMethod.SHA256, policyUri),
              elementIdToSign: elementIdToSign
         // elementIdToSign: Guid.NewGuid().ToString()

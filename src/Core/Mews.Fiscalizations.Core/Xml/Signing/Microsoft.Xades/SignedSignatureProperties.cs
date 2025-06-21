@@ -9,15 +9,16 @@ namespace Mews.Fiscalizations.Core.Xml.Signing.Microsoft.Xades;
 /// </summary>
 internal sealed class SignedSignatureProperties
 {
-	private DateTime signingTime;
+	private DateTimeOffset signingTime;
 
-	/// <summary>
-	/// The signing time property specifies the time at which the signer
-	/// performed the signing process. This is a signed property that
-	/// qualifies the whole signature. An XML electronic signature aligned
-	/// with the present document MUST contain exactly one SigningTime element .
-	/// </summary>
-	public DateTime SigningTime
+    /// <summary>
+    /// The signing time property specifies the time at which the signer
+    /// performed the signing process. This is a signed property that
+    /// qualifies the whole signature. An XML electronic signature aligned
+    /// with the present document MUST contain exactly one SigningTime element .
+    /// 改用DateTimeOffset避免时区问题
+    /// </summary>
+    public DateTimeOffset SigningTime
 	{
 		get => signingTime;
 		set => signingTime = value;
@@ -79,7 +80,7 @@ internal sealed class SignedSignatureProperties
 	/// </summary>
 	public SignedSignatureProperties()
 	{
-		signingTime = DateTime.MinValue;
+		signingTime = DateTimeOffset.MinValue;
 		SigningCertificate = new SigningCertificate();
 		SignaturePolicyIdentifier = new SignaturePolicyIdentifier();
 		SignatureProductionPlace = new SignatureProductionPlace();
@@ -160,16 +161,16 @@ internal sealed class SignedSignatureProperties
 		var creationXmlDocument = new XmlDocument();
 		var retVal = creationXmlDocument.CreateElement(XadesSignedXml.XmlXadesPrefix, "SignedSignatureProperties", XadesSignedXml.XadesNamespaceUri);
 
-		if (signingTime == DateTime.MinValue)
+		if (signingTime ==DateTimeOffset.MinValue)
 		{
-			signingTime = DateTime.Now;
+			signingTime = DateTimeOffset.Now;
 		}
 
 		var bufferXmlElement = creationXmlDocument.CreateElement(XadesSignedXml.XmlXadesPrefix, "SigningTime", XadesSignedXml.XadesNamespaceUri);
                                    
 		var truncatedDateTime = signingTime.AddTicks(-(signingTime.Ticks % TimeSpan.TicksPerSecond));
 
-		bufferXmlElement.InnerText = XmlConvert.ToString(truncatedDateTime, XmlDateTimeSerializationMode.Local);            
+		bufferXmlElement.InnerText = XmlConvert.ToString(truncatedDateTime);            
 
 		retVal.AppendChild(bufferXmlElement);
 

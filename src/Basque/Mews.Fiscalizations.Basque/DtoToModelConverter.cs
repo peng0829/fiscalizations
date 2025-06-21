@@ -33,7 +33,7 @@ public static class DtoToModelConverter
            state: ParseEnum<InvoiceState>(result.Estado),
            description: result.Descripcion,
            signatureValue: signatureValue,
-           validationResults: result.ResultadosValidacion?.Select(v => Convert(v)));
+           validationResults: result.ResultadosValidacion?.Select(Convert));
         //foreach (var item in sendSesponse.ValidationResults.Get())
         //{
         //    Debug.WriteLine("ValidationResults");

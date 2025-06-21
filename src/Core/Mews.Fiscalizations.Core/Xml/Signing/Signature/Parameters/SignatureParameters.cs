@@ -8,7 +8,7 @@ public sealed class SignatureParameters(
     Signer signer,
     SignatureMethod signatureMethod,
     DigestMethod digestMethod,
-    DateTime signingDate,
+    DateTimeOffset signingDate,
     SignerRole signerRole = null,
     List<SignatureCommitment> signatureCommitments = null,
     SignatureProductionPlace signatureProductionPlace = null,
@@ -27,7 +27,7 @@ public sealed class SignatureParameters(
 
     public DigestMethod DigestMethod { get; } = digestMethod;
 
-    public DateTime SigningDate { get; } = signingDate;
+    public DateTimeOffset SigningDate { get; } = signingDate;
 
     public SignerRole SignerRole { get; } = signerRole;
 
